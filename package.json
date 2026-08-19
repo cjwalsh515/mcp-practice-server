@@ -1,0 +1,19 @@
+{
+  "name": "mcp-practice-server",
+  "version": "1.0.0",
+  "description": "A minimal MCP server exposing a single ping tool, used as a connectivity test.",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "@types/node": "^26.2.0"
+  }
+}
