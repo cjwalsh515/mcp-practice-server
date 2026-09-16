@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Real credentials/tokens and personal photo data should never be committed
+client_secret*.json
+gmail_token.json
+gmail_export_log.json
+chapters.yaml
+/culled/
+/pre-2015/

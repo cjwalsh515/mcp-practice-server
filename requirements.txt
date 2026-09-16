@@ -1,0 +1,20 @@
+# Core pass 1 (heuristics only)
+Pillow>=10.0
+pillow-heif>=0.15          # HEIC/HEIF support (iPhone originals)
+numpy>=1.24
+opencv-python-headless>=4.8  # variance-of-Laplacian blur detection
+ImageHash>=4.3              # perceptual hashing for burst/near-duplicate detection
+PyYAML>=6.0                 # chapter date-range config
+tqdm>=4.66                  # progress bars
+
+# Pass 2 (Claude vision tiebreaker)
+anthropic>=0.40
+
+# Gmail pre-2015 attachment export
+google-api-python-client>=2.100
+google-auth-httplib2>=0.2
+google-auth-oauthlib>=1.2
+
+# Tests
+pytest>=8.0
+piexif>=1.1                 # writing EXIF into synthetic test images

@@ -1,0 +1,23 @@
+# Optional. Point pass1 at a copy of this file with --chapters once the
+# chapter list firms up. Until then, omit --chapters and photos are grouped
+# into year-month folders instead of chapter names.
+#
+# Ranges are inclusive dates (YYYY-MM-DD). Overlapping ranges resolve to the
+# first match in file order.
+
+chapters:
+  - name: "How We Met"
+    start: "2007-01-01"
+    end: "2009-12-31"
+  - name: "Dating"
+    start: "2010-01-01"
+    end: "2013-06-30"
+  - name: "Engagement"
+    start: "2013-07-01"
+    end: "2014-12-31"
+  - name: "The Wedding"
+    start: "2015-01-01"
+    end: "2015-12-31"
+  - name: "Married Life"
+    start: "2016-01-01"
+    end: "2026-12-31"
