@@ -33,11 +33,15 @@ def test_missing_camera_exif(photo_factory):
     assert not meta.has_camera_exif
 
 
-def test_falls_back_to_filesystem_time_when_no_exif(photo_factory):
+def test_no_mtime_fallback_when_no_exif_timestamp(photo_factory):
+    # A freshly-copied/re-downloaded file's mtime reflects when it landed on
+    # disk, not when the photo was taken — it must never be used as a stand-in
+    # date. No usable EXIF timestamp should leave datetime unset entirely, so
+    # the photo falls through to clustering.py's "undated" handling.
     path = photo_factory(camera=False, dt=None)
     meta = read_metadata(path)
-    assert meta.datetime is not None
-    assert meta.datetime_source == "filesystem"
+    assert meta.datetime is None
+    assert meta.datetime_source == "none"
 
 
 def test_implausible_timestamps_rejected():

@@ -31,7 +31,7 @@ class PhotoMetadata:
     width: Optional[int] = None
     height: Optional[int] = None
     datetime: Optional[datetime] = None
-    datetime_source: str = "none"  # "exif" | "filesystem" | "none"
+    datetime_source: str = "none"  # "exif" | "none"
     lat: Optional[float] = None
     lon: Optional[float] = None
     camera_make: Optional[str] = None
@@ -156,14 +156,11 @@ def read_metadata(path: Path) -> PhotoMetadata:
         meta.error = f"{type(exc).__name__}: {exc}"
         logger.warning("Failed to read %s: %s", path, meta.error)
 
-    if meta.datetime is None:
-        try:
-            mtime = path.stat().st_mtime
-            fs_dt = datetime.fromtimestamp(mtime)
-            if is_plausible_timestamp(fs_dt):
-                meta.datetime = fs_dt
-                meta.datetime_source = "filesystem"
-        except OSError:
-            pass
+    # Deliberately no filesystem-mtime fallback: st_mtime reflects when a file
+    # landed on disk (export/copy/download time), not when the photo was
+    # taken, and using it here fabricated a plausible-looking but wrong date
+    # that corrupted clustering. A photo with no usable EXIF timestamp stays
+    # meta.datetime = None and falls through to clustering.py's "undated"
+    # trailing cluster instead.
 
     return meta
