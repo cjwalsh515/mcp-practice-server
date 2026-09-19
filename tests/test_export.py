@@ -110,3 +110,90 @@ def test_run_export_no_keeps_returns_empty(tmp_path):
     dest_dir = tmp_path / "final"
     exported = run_export(output_dir, dest_dir)
     assert exported == []
+
+
+def test_reexport_with_unchanged_decisions_is_idempotent_not_duplicated(tmp_path):
+    output_dir = tmp_path / "output"
+    _make_cluster(output_dir, "2018-07", "c1", ["photo.jpg"])
+    _write_decisions(output_dir, {"2018-07/c1/photo.jpg": {"decision": "keep", "decided_at": "t1"}})
+
+    dest_dir = tmp_path / "final"
+    run_export(output_dir, dest_dir)
+    second = run_export(output_dir, dest_dir)
+
+    assert len(second) == 1
+    assert second[0]["exported_path"] == str(dest_dir / "2018-07" / "c1_photo.jpg")
+    # no __1 duplicate from treating the previous run's own file as a collision
+    assert list((dest_dir / "2018-07").glob("c1_photo*")) == [dest_dir / "2018-07" / "c1_photo.jpg"]
+
+
+def test_reexport_prunes_file_when_decision_flips_to_skip(tmp_path):
+    output_dir = tmp_path / "output"
+    _make_cluster(output_dir, "2018-07", "c1", ["photo.jpg"])
+    _write_decisions(output_dir, {"2018-07/c1/photo.jpg": {"decision": "keep", "decided_at": "t1"}})
+
+    dest_dir = tmp_path / "final"
+    run_export(output_dir, dest_dir)
+    assert (dest_dir / "2018-07" / "c1_photo.jpg").exists()
+
+    _write_decisions(output_dir, {"2018-07/c1/photo.jpg": {"decision": "skip", "decided_at": "t2"}})
+    second = run_export(output_dir, dest_dir)
+
+    assert second == []
+    assert not (dest_dir / "2018-07" / "c1_photo.jpg").exists()
+    # the whole chapter folder is gone too, since nothing else was in it
+    assert not (dest_dir / "2018-07").exists()
+
+
+def test_reexport_prunes_stale_folder_after_relabel_style_rel_path_change(tmp_path):
+    # Simulates relabel.py having moved the underlying cluster and rewritten
+    # review_decisions.json's key to match — the old chapter-named export
+    # folder must not be left behind as clutter in --dest.
+    output_dir = tmp_path / "output"
+    _make_cluster(output_dir, "2018-07", "2018-07-04_001", ["photo.jpg"])
+    _write_decisions(
+        output_dir, {"2018-07/2018-07-04_001/photo.jpg": {"decision": "keep", "decided_at": "t1"}}
+    )
+
+    dest_dir = tmp_path / "final"
+    run_export(output_dir, dest_dir)
+    assert (dest_dir / "2018-07" / "2018-07-04_001_photo.jpg").exists()
+
+    # relabel.py's real effect: the file moves on disk under --output, and
+    # review_decisions.json's key is rewritten to the new chapter label.
+    old_cluster_dir = output_dir / "2018-07" / "2018-07-04_001"
+    new_cluster_dir = output_dir / "how-we-met" / "2018-07-04_001"
+    new_cluster_dir.parent.mkdir(parents=True)
+    old_cluster_dir.rename(new_cluster_dir)
+    _write_decisions(
+        output_dir, {"how-we-met/2018-07-04_001/photo.jpg": {"decision": "keep", "decided_at": "t1"}}
+    )
+
+    second = run_export(output_dir, dest_dir)
+
+    assert len(second) == 1
+    assert (dest_dir / "how-we-met" / "2018-07-04_001_photo.jpg").exists()
+    # old chapter folder fully cleaned up, not left behind as stale clutter
+    assert not (dest_dir / "2018-07").exists()
+
+
+def test_reexport_never_touches_files_it_did_not_create(tmp_path):
+    output_dir = tmp_path / "output"
+    _make_cluster(output_dir, "2018-07", "c1", ["photo.jpg"])
+    _write_decisions(output_dir, {"2018-07/c1/photo.jpg": {"decision": "keep", "decided_at": "t1"}})
+
+    dest_dir = tmp_path / "final"
+    run_export(output_dir, dest_dir)
+
+    # user manually drops something into the export folder and into an
+    # unrelated chapter folder that this tool never exported anything to
+    (dest_dir / "notes.txt").write_text("do not touch")
+    manual_dir = dest_dir / "manual-additions"
+    manual_dir.mkdir()
+    (manual_dir / "my_own_photo.jpg").write_bytes(b"fake")
+
+    _write_decisions(output_dir, {"2018-07/c1/photo.jpg": {"decision": "skip", "decided_at": "t2"}})
+    run_export(output_dir, dest_dir)
+
+    assert (dest_dir / "notes.txt").read_text() == "do not touch"
+    assert (manual_dir / "my_own_photo.jpg").exists()

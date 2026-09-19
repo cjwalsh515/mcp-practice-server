@@ -176,3 +176,63 @@ def test_relabel_requires_existing_manifest(tmp_path):
     chapters_path = _write_chapters(tmp_path)
     with pytest.raises(FileNotFoundError):
         run_relabel(tmp_path / "nope", chapters_path)
+
+
+def test_relabel_resumes_at_first_undecided_item_not_blindly_zero(tmp_path):
+    # Two clusters, both relabeled into the same new chapter. The first
+    # (alphabetically) is already fully decided; the second is not. If
+    # relabel just reset current_index to 0, resuming review would mean
+    # paging back past the already-decided first cluster to reach the
+    # second -- exactly the friction this is meant to avoid.
+    output_dir = tmp_path / "output"
+    cluster_a = output_dir / "2018-07" / "2018-07-04_001"
+    cluster_a.mkdir(parents=True)
+    Image.new("RGB", (50, 50)).save(cluster_a / "photo_a.jpg")
+
+    cluster_b = output_dir / "2018-07" / "2018-07-05_001"
+    cluster_b.mkdir(parents=True)
+    Image.new("RGB", (50, 50)).save(cluster_b / "photo_b.jpg")
+
+    manifest = Manifest()
+    manifest.add(
+        PhotoRecord(
+            original_path="/source/a.jpg",
+            status=STATUS_KEPT,
+            cluster_id="2018-07-04_001",
+            chapter_label="2018-07",
+            output_path=str(cluster_a / "photo_a.jpg"),
+        )
+    )
+    manifest.add(
+        PhotoRecord(
+            original_path="/source/b.jpg",
+            status=STATUS_KEPT,
+            cluster_id="2018-07-05_001",
+            chapter_label="2018-07",
+            output_path=str(cluster_b / "photo_b.jpg"),
+        )
+    )
+    manifest.write_json(output_dir / "manifest.json")
+    manifest.write_csv(output_dir / "manifest.csv")
+
+    decisions = {
+        "decisions": {
+            "2018-07/2018-07-04_001/photo_a.jpg": {"decision": "keep", "decided_at": "t1"},
+        },
+        "current_index": 7,  # a stale position from before relabeling
+    }
+    (output_dir / DECISIONS_FILENAME).write_text(json.dumps(decisions), encoding="utf-8")
+
+    chapters_path = _write_chapters(tmp_path)  # both dates fall inside "How We Met"
+    run_relabel(output_dir, chapters_path)
+
+    from photo_pipeline.review import build_review_items
+
+    new_items = build_review_items(output_dir)
+    assert [i["rel_path"] for i in new_items] == [
+        "how-we-met/2018-07-04_001/photo_a.jpg",
+        "how-we-met/2018-07-05_001/photo_b.jpg",
+    ]
+
+    data = json.loads((output_dir / DECISIONS_FILENAME).read_text())
+    assert data["current_index"] == 1  # cluster b's undecided photo, not 0

@@ -166,12 +166,29 @@ let items = [];
 let decisions = {};
 let index = 0;
 
+function firstUndecidedFrom(start) {
+  for (let i = start; i < items.length; i++) {
+    if (!decisions[items[i].rel_path]) return i;
+  }
+  for (let i = 0; i < start; i++) {
+    if (!decisions[items[i].rel_path]) return i;
+  }
+  return start; // everything is decided; stay put
+}
+
 async function loadState() {
   const res = await fetch('/api/items');
   const data = await res.json();
   items = data.items;
   decisions = data.decisions;
   index = items.length ? Math.min(Math.max(data.current_index || 0, 0), items.length - 1) : 0;
+  // The item at a saved position can stop being "next" across sessions —
+  // e.g. running pass2/pass3 again adds or reorders clusters. If we'd
+  // resume on something already decided, jump to the next undecided photo
+  // instead of making you page back past everything you've already done.
+  if (items.length && decisions[items[index].rel_path]) {
+    index = firstUndecidedFrom(index);
+  }
   render();
 }
 

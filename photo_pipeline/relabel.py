@@ -52,7 +52,7 @@ from typing import Optional
 from .chapters import ChapterRange, assign_chapter, load_chapters, slugify
 from .manifest import Manifest
 from .output_layout import discover_cluster_dirs
-from .review import DECISIONS_FILENAME
+from .review import DECISIONS_FILENAME, build_review_items
 
 logger = logging.getLogger("photo_pipeline.relabel")
 
@@ -188,10 +188,18 @@ def update_decisions(output_dir: Path, applied: list[RelabelPlan]) -> int:
 
     data["decisions"] = new_decisions
     if rewritten:
-        # Item order depends on chapter folder names, which just changed —
-        # every decision is preserved, but "where was I" no longer means
-        # the same thing.
-        data["current_index"] = 0
+        # Item order depends on chapter folder names, which just changed, so
+        # the old numeric position no longer points at the same photo. Rather
+        # than resetting to 0 and making you page back past everything
+        # you've already decided, resume at the first still-undecided photo
+        # in the new order — every prior decision is already preserved above,
+        # this only affects where browsing picks back up. (Called after the
+        # physical moves have happened, so this reflects the new layout.)
+        items = build_review_items(output_dir)
+        data["current_index"] = next(
+            (i for i, item in enumerate(items) if item["rel_path"] not in new_decisions),
+            0,
+        )
 
     decisions_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return rewritten

@@ -178,13 +178,14 @@ moves as one unit, `manifest.json`/`.csv` gets `chapter_label` (and
 `pass3_selected`/`pass3_notes` are untouched — and `review_decisions.json`
 keys are rewritten to match, so every prior keep/skip call survives.
 
-Two things it can't do anything about: the "undated" cluster (no date to
-work from — left exactly where it is), and `review_decisions.json`'s
-"resume where I left off" position, which resets to 0 after a relabel
-that moves anything, because review order depends on chapter folder names
-and those just changed — no individual decision is lost, only the
-browsing cursor. Safe to run more than once; a cluster already at its
-correct label is a no-op.
+The one thing it can't do anything about: the "undated" cluster has no
+date to relabel from, so it's left exactly where it is. Everything else,
+including `review_decisions.json`'s "resume where I left off" position,
+is handled — relabel recomputes the new browsing order and points
+`current_index` at the first still-undecided photo in it, so resuming
+review afterward doesn't mean paging back past everything you already
+decided. Safe to run more than once; a cluster already at its correct
+label is a no-op.
 
 ## 7. Fast local review
 
@@ -203,16 +204,24 @@ only reads files under `--output` and writes a small
 Keys: `Y` keep, `N` skip (both auto-advance), `→`/space next without
 deciding, `←`/Backspace/`U` back (revisit a photo to change your mind).
 Decisions save after every keystroke, so closing the tab (or `Ctrl+C`-ing
-the server) never loses progress — relaunching resumes exactly where you
-left off.
+the server) never loses progress.
 
-**Run order matters here.** review.py decides which layer to show
-(`highlights/` > `best/` > `kept`) fresh each time it launches. If you
-review a cluster while it's still showing `kept`, then later run pass 3
-(which adds `highlights/`), the *next* launch will show that cluster's
-`highlights/` photos as new, undecided items — your old decisions on the
-`kept` files aren't lost (nothing is ever deleted) but they become
-orphaned extra work. Run pass 2 and/or pass 3 once, then review once.
+Resuming does **not** just reopen at the raw saved position — on load, if
+that position is already decided (most commonly because the item order
+changed since your last session, e.g. from relabel.py, or from running
+pass2/pass3 again), it jumps forward to the next undecided photo instead
+of making you page back past everything you've already called. You never
+have to re-click through decided photos to pick up where you left off.
+
+**Run order still matters, though.** review.py decides which layer to
+show (`highlights/` > `best/` > `kept`) fresh each time it launches. If
+you review a cluster while it's still showing `kept`, then later run
+pass 3 (which adds `highlights/`), the *next* launch will show that
+cluster's `highlights/` photos as new, undecided items — your old
+decisions on the `kept` files aren't lost (nothing is ever deleted), but
+they're now extra work you didn't need to redo. The auto-skip above stops
+that from meaning re-clicking through a huge already-decided backlog, but
+it's still best to run pass 2 and/or pass 3 once, then review once.
 
 Each cluster's speed depends on which layer you're reviewing: a cluster
 narrowed by pass 3 is usually 1 photo (auto-highlighted, no choices to
@@ -234,9 +243,18 @@ Reads `review_decisions.json`, copies every photo marked `keep` into
 different events, and doubles as a free date/event breadcrumb for the
 later captioning/map phases). Generates a contact sheet per exported
 chapter, plus `export_manifest.csv` / `.json` recording exactly what got
-exported and when it was decided. Safe to re-run any time after more
-review progress — it always reflects the current state of
-`review_decisions.json`.
+exported and when it was decided.
+
+Re-running is a **sync**, not just an append: it compares the new run
+against the previous `export_manifest.json` and removes anything it
+previously placed that's no longer part of the current keep-set — a
+decision that flipped from keep to skip, or a chapter folder renamed by
+`relabel.py` on `--output`. It only ever deletes files it tracked in its
+own manifest; anything you've added to `--dest` by hand (extra photos,
+notes) is left alone. So it's always safe to re-run after more review
+progress, after a relabel, or after changing your mind on a few photos —
+`--dest` always ends up reflecting exactly the current
+`review_decisions.json`, never a stale mix of old and new.
 
 ## 9. Audit trail
 
