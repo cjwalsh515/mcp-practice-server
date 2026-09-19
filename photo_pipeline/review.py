@@ -41,6 +41,7 @@ from urllib.parse import parse_qs, urlparse
 from PIL import Image
 
 from . import heic_support  # noqa: F401
+from . import lock as pipeline_lock
 from .output_layout import discover_cluster_dirs, review_candidates
 
 logger = logging.getLogger("photo_pipeline.review")
@@ -423,27 +424,33 @@ def run_server(
     max_dimension: int = DEFAULT_MAX_DIMENSION,
     open_browser: bool = True,
 ) -> None:
-    server, items, store = build_server(output_dir, port=port, max_dimension=max_dimension)
-    actual_port = server.server_address[1]
-    url = f"http://127.0.0.1:{actual_port}/"
+    # Held for the server's entire lifetime, not just at startup: this
+    # process caches decisions/items in memory for as long as it runs and
+    # writes the full cache back on every keystroke, so relabel.py touching
+    # the same files anytime while a session is open would get silently
+    # reverted by the next click. See lock.py and docs/SETUP.md.
+    with pipeline_lock.acquire(output_dir, owner="review.py"):
+        server, items, store = build_server(output_dir, port=port, max_dimension=max_dimension)
+        actual_port = server.server_address[1]
+        url = f"http://127.0.0.1:{actual_port}/"
 
-    logger.info("%d photos to review under %s", len(items), output_dir)
-    logger.info("Review server running at %s — press Ctrl+C to stop.", url)
+        logger.info("%d photos to review under %s", len(items), output_dir)
+        logger.info("Review server running at %s — press Ctrl+C to stop.", url)
 
-    if open_browser:
-        def _open():
-            time.sleep(0.4)
-            webbrowser.open(url)
+        if open_browser:
+            def _open():
+                time.sleep(0.4)
+                webbrowser.open(url)
 
-        threading.Thread(target=_open, daemon=True).start()
+            threading.Thread(target=_open, daemon=True).start()
 
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.server_close()
-        logger.info("Decisions saved to %s", store.path)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
+            logger.info("Decisions saved to %s", store.path)
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -460,12 +467,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = build_arg_parser().parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s")
 
-    run_server(
-        args.output,
-        port=args.port,
-        max_dimension=args.max_dimension,
-        open_browser=not args.no_browser,
-    )
+    try:
+        run_server(
+            args.output,
+            port=args.port,
+            max_dimension=args.max_dimension,
+            open_browser=not args.no_browser,
+        )
+    except pipeline_lock.LockHeld as exc:
+        logger.error(str(exc))
+        return 1
     return 0
 
 

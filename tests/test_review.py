@@ -1,15 +1,19 @@
 import json
+import os
 import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 
+import pytest
 from PIL import Image
 
+from photo_pipeline.lock import LOCK_FILENAME, LockHeld
 from photo_pipeline.review import (
     DecisionsStore,
     build_review_items,
     build_server,
+    run_server,
 )
 
 
@@ -109,3 +113,11 @@ def test_server_endpoints_end_to_end(tmp_path):
     reloaded = DecisionsStore(tmp_path / "review_decisions.json")
     assert reloaded.decisions[rel_path]["decision"] == "keep"
     assert reloaded.current_index == 1
+
+
+def test_run_server_refuses_to_start_while_relabel_lock_is_held(tmp_path):
+    _make_cluster(tmp_path, "2018-07", "c1", n=1)
+    (tmp_path / LOCK_FILENAME).write_text(json.dumps({"owner": "relabel.py", "pid": os.getpid()}))
+
+    with pytest.raises(LockHeld, match="relabel.py"):
+        run_server(tmp_path, port=0, open_browser=False)

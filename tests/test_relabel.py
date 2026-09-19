@@ -1,8 +1,10 @@
 import json
+import os
 
 import pytest
 from PIL import Image
 
+from photo_pipeline.lock import LOCK_FILENAME
 from photo_pipeline.manifest import STATUS_KEPT, Manifest, PhotoRecord
 from photo_pipeline.relabel import run_relabel
 from photo_pipeline.review import DECISIONS_FILENAME
@@ -236,3 +238,34 @@ def test_relabel_resumes_at_first_undecided_item_not_blindly_zero(tmp_path):
 
     data = json.loads((output_dir / DECISIONS_FILENAME).read_text())
     assert data["current_index"] == 1  # cluster b's undecided photo, not 0
+
+
+def test_relabel_refuses_to_run_while_review_server_lock_is_held(tmp_path):
+    output_dir = tmp_path / "output"
+    cluster_dir, _ = _build_year_month_output(output_dir)
+    chapters_path = _write_chapters(tmp_path)
+
+    (output_dir / LOCK_FILENAME).write_text(json.dumps({"owner": "review.py", "pid": os.getpid()}))
+
+    with pytest.raises(RuntimeError, match="review.py"):
+        run_relabel(output_dir, chapters_path)
+
+    # nothing was touched -- the lock check happens before any move
+    assert cluster_dir.exists()
+    manifest_text_before = (output_dir / "manifest.json").read_text()
+    assert json.loads(manifest_text_before)  # still valid/untouched
+    for record in json.loads(manifest_text_before):
+        assert record["chapter_label"] in ("2018-07", "undated")
+
+
+def test_relabel_dry_run_ignores_review_server_lock(tmp_path):
+    # Dry-run never writes anything, so it's safe to run even with a live
+    # review.py session -- only the real, mutating run needs the lock.
+    output_dir = tmp_path / "output"
+    _build_year_month_output(output_dir)
+    chapters_path = _write_chapters(tmp_path)
+
+    (output_dir / LOCK_FILENAME).write_text(json.dumps({"owner": "review.py", "pid": os.getpid()}))
+
+    result = run_relabel(output_dir, chapters_path, dry_run=True)
+    assert result == {"planned": 1}

@@ -187,6 +187,19 @@ review afterward doesn't mean paging back past everything you already
 decided. Safe to run more than once; a cluster already at its correct
 label is a no-op.
 
+**Stop review.py before running this.** review.py loads
+`review_decisions.json` into memory once at startup and writes that
+*entire* in-memory copy back on every keystroke — it never re-reads the
+file. If a review.py server is still running (browser tab open or not)
+while you run relabel.py, the next click in that tab would silently
+overwrite everything relabel just rewrote with the stale pre-relabel
+state. This is enforced, not just a reminder: relabel.py checks for a
+live review.py process and refuses to run with a clear error if it finds
+one, rather than risking a silent overwrite. Stop the review.py server
+(`Ctrl+C`), run relabel.py, then start review.py again to pick up the new
+layout. (Dry-run is exempt — it never writes anything, so it's always
+safe to run alongside a live session.)
+
 ## 7. Fast local review
 
 A keyboard-driven local web app for quickly deciding keep/skip, one photo
@@ -221,7 +234,22 @@ cluster's `highlights/` photos as new, undecided items — your old
 decisions on the `kept` files aren't lost (nothing is ever deleted), but
 they're now extra work you didn't need to redo. The auto-skip above stops
 that from meaning re-clicking through a huge already-decided backlog, but
-it's still best to run pass 2 and/or pass 3 once, then review once.
+it's still best to run pass 2 and/or pass 3 once, then review once. This
+one isn't enforced with a hard error like the relabel.py lock below —
+pass2.py/pass3.py only ever *add* new best/highlights files, they never
+rewrite `review_decisions.json` or move anything a live session has
+already cached, so the worst case is extra review work, not an overwrite.
+
+**relabel.py is different, and review.py will refuse to start (or vice
+versa) if the other is actively running against the same `--output`
+folder.** Unlike pass2/pass3, relabel.py rewrites `review_decisions.json`
+directly and moves the folders a live review.py session has cached paths
+for — exactly the kind of change that could get silently reverted by
+review.py's next save. Both tools check for a lock file
+(`.photo_pipeline.lock` in `--output`) before doing anything that writes,
+and fail loudly naming the other process if it's still alive, rather than
+racing. See the relabel.py section above for the stop/run/restart
+sequence this means in practice.
 
 Each cluster's speed depends on which layer you're reviewing: a cluster
 narrowed by pass 3 is usually 1 photo (auto-highlighted, no choices to

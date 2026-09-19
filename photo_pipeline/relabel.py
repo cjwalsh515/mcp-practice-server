@@ -49,6 +49,7 @@ from datetime import date
 from pathlib import Path
 from typing import Optional
 
+from . import lock as pipeline_lock
 from .chapters import ChapterRange, assign_chapter, load_chapters, slugify
 from .manifest import Manifest
 from .output_layout import discover_cluster_dirs
@@ -228,10 +229,17 @@ def run_relabel(output_dir: Path, chapters_path: Path, *, dry_run: bool = False)
             logger.info("[dry-run] %s: %s -> %s", plan.cluster_id, plan.old_label, plan.new_label)
         return {"planned": len(moves)}
 
-    applied, skipped = apply_moves(moves)
-    _cleanup_empty_chapter_dirs(output_dir)
-    manifest_updated = update_manifest(output_dir, applied)
-    decisions_rewritten = update_decisions(output_dir, applied)
+    # Refuses to proceed if review.py's server is actively holding this
+    # output folder (see lock.py): review.py caches decisions/items in
+    # memory for its whole run and writes the full cache back on every
+    # keystroke, so moving files and rewriting review_decisions.json out
+    # from under a live session would get silently reverted by its next
+    # save. Stop review.py first, then run this, then restart review.py.
+    with pipeline_lock.acquire(output_dir, owner="relabel.py"):
+        applied, skipped = apply_moves(moves)
+        _cleanup_empty_chapter_dirs(output_dir)
+        manifest_updated = update_manifest(output_dir, applied)
+        decisions_rewritten = update_decisions(output_dir, applied)
 
     logger.info(
         "Relabeled %d cluster(s), updated %d manifest record(s), rewrote %d review decision key(s).",
@@ -267,7 +275,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = build_arg_parser().parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s")
 
-    run_relabel(args.output, args.chapters, dry_run=args.dry_run)
+    try:
+        run_relabel(args.output, args.chapters, dry_run=args.dry_run)
+    except pipeline_lock.LockHeld as exc:
+        logger.error(str(exc))
+        return 1
     return 0
 
 
