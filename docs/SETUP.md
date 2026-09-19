@@ -81,7 +81,19 @@ python -m photo_pipeline.pass1 \
 
 `--chapters` is optional (copy `chapters.example.yaml` and edit once the
 chapter list firms up — see that file's comments); without it, clusters
-are grouped into year-month folders instead. Useful flags:
+are grouped into year-month folders instead.
+
+**If you set up (or change) `chapters.yaml` *after* you've already run
+pass1** — and possibly reviewed some of the output by hand — don't just
+re-run pass1 with `--chapters` pointed at the same `--output` directory.
+Pass1 never deletes anything, so that duplicates every kept photo under
+new chapter folders alongside the old year-month ones, overwrites
+`manifest.json` (discarding pass2/pass3 annotations), and orphans any
+`review_decisions.json` progress. Use `photo_pipeline.relabel` instead
+(step 6a below) to reorganize the existing output in place without
+losing any of that.
+
+Useful flags:
 
 - `--years 2018,2019` — restrict a run to specific years (also how you'd
   batch a huge library into several smaller runs).
@@ -142,6 +154,37 @@ per cluster (default 2).
 You can run pass 2 and pass 3 in either order relative to *each other*.
 But run whichever of them you're going to use **before** you start a
 review session (step 7) — see the note there about why.
+
+## 6a. Relabeling chapters in place (only if you add/change chapters.yaml later)
+
+If you started without `chapters.yaml` (or with an earlier version of it)
+and already have year-month-labeled output — possibly with pass2/pass3
+already run and some photos already reviewed by hand — this reorganizes
+the existing `--output` folder to match a new `chapters.yaml` without
+re-running clustering, blur, dedup, pass2, or pass3, and without losing
+any review progress:
+
+```bash
+python -m photo_pipeline.relabel --output ~/culled --chapters chapters.yaml --dry-run -v
+python -m photo_pipeline.relabel --output ~/culled --chapters chapters.yaml -v
+```
+
+Each cluster's id already encodes its own date (`YYYY-MM-DD_NNN`), so the
+new chapter label is recomputed straight from the folder name — no photo
+content is re-examined. For every cluster whose label actually changes,
+the whole subfolder (kept photos, `best/`, `highlights/`, contact sheet)
+moves as one unit, `manifest.json`/`.csv` gets `chapter_label` (and
+`output_path`) rewritten in place — `pass2_selected`/`pass2_notes`/
+`pass3_selected`/`pass3_notes` are untouched — and `review_decisions.json`
+keys are rewritten to match, so every prior keep/skip call survives.
+
+Two things it can't do anything about: the "undated" cluster (no date to
+work from — left exactly where it is), and `review_decisions.json`'s
+"resume where I left off" position, which resets to 0 after a relabel
+that moves anything, because review order depends on chapter folder names
+and those just changed — no individual decision is lost, only the
+browsing cursor. Safe to run more than once; a cluster already at its
+correct label is a no-op.
 
 ## 7. Fast local review
 

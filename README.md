@@ -25,6 +25,11 @@ Stages:
    into a handoff-ready folder, grouped by chapter, with a contact sheet
    per chapter and an export manifest. The actual finish line.
 
+A utility script, `photo_pipeline/relabel.py`, reorganizes an existing
+output folder's chapter grouping in place if you set up (or change)
+`chapters.yaml` after already running pass1/2/3/review — without
+re-clustering, discarding pass2/pass3 results, or losing review progress.
+
 A separate script (`photo_pipeline/gmail_export.py`) downloads pre-2015
 photos that only exist as Gmail attachments, so they can flow into the
 same pipeline.
