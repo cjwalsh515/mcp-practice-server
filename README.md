@@ -21,6 +21,9 @@ Stages:
 4. **Review** (`photo_pipeline/review.py`) — a fast, local, keyboard-driven
    web app (no network calls) for flipping through the curated output one
    photo at a time and marking keep/skip, with durable, resumable progress.
+5. **Export** (`photo_pipeline/export.py`) — turns review's keep decisions
+   into a handoff-ready folder, grouped by chapter, with a contact sheet
+   per chapter and an export manifest. The actual finish line.
 
 A separate script (`photo_pipeline/gmail_export.py`) downloads pre-2015
 photos that only exist as Gmail attachments, so they can flow into the
@@ -39,6 +42,7 @@ python -m photo_pipeline.pass1 --input ~/photos --output ~/culled -v
 python -m photo_pipeline.pass2 --output ~/culled -v   # needs ANTHROPIC_API_KEY
 python -m photo_pipeline.pass3 --output ~/culled -v   # needs ANTHROPIC_API_KEY, independent of pass 2
 python -m photo_pipeline.review --output ~/culled     # local only, no API key
+python -m photo_pipeline.export --output ~/culled --dest ~/PhotoProject/final
 ```
 
 Not in scope for this build: photobook layout, captions, and the

@@ -139,8 +139,9 @@ is auto-highlighted without spending an API call — there's nothing to
 compare. Use `--dry-run` first, and `--top-n` to change how many highlights
 per cluster (default 2).
 
-You can run pass 2 and pass 3 in either order, or skip pass 2 entirely and
-run pass 3 straight off pass 1's `kept` output.
+You can run pass 2 and pass 3 in either order relative to *each other*.
+But run whichever of them you're going to use **before** you start a
+review session (step 7) — see the note there about why.
 
 ## 7. Fast local review
 
@@ -162,10 +163,42 @@ Decisions save after every keystroke, so closing the tab (or `Ctrl+C`-ing
 the server) never loses progress — relaunching resumes exactly where you
 left off.
 
-## 8. Review
+**Run order matters here.** review.py decides which layer to show
+(`highlights/` > `best/` > `kept`) fresh each time it launches. If you
+review a cluster while it's still showing `kept`, then later run pass 3
+(which adds `highlights/`), the *next* launch will show that cluster's
+`highlights/` photos as new, undecided items — your old decisions on the
+`kept` files aren't lost (nothing is ever deleted) but they become
+orphaned extra work. Run pass 2 and/or pass 3 once, then review once.
 
-Flip through the `_contact_sheet.jpg` files, the `best/`/`highlights/`
-subfolders, or use the review tool above, and treat `manifest.csv` as the
-audit trail for anything that got cut. Nothing is deleted, so if any pass
-was too aggressive on a particular cluster, the excluded originals are
-still sitting where they started.
+Each cluster's speed depends on which layer you're reviewing: a cluster
+narrowed by pass 3 is usually 1 photo (auto-highlighted, no choices to
+make) or up to `--top-n`; a cluster you're reviewing straight off pass 1's
+`kept` output could still have 5-15 candidates in it.
+
+## 8. Export your final picks
+
+This is the actual finish line — turning your `Y` decisions into a folder
+you can hand to Mixbook:
+
+```bash
+python -m photo_pipeline.export --output ~/culled --dest ~/PhotoProject/final
+```
+
+Reads `review_decisions.json`, copies every photo marked `keep` into
+`--dest`, grouped by chapter folder (`<dest>/<chapter>/<cluster-id>_<filename>`
+— the cluster-id prefix avoids collisions between same-named photos from
+different events, and doubles as a free date/event breadcrumb for the
+later captioning/map phases). Generates a contact sheet per exported
+chapter, plus `export_manifest.csv` / `.json` recording exactly what got
+exported and when it was decided. Safe to re-run any time after more
+review progress — it always reflects the current state of
+`review_decisions.json`.
+
+## 9. Audit trail
+
+If you'd rather not use the review tool, you can also just flip through
+the `_contact_sheet.jpg` files and the `best/`/`highlights/` subfolders by
+hand and copy your picks over yourself — `manifest.csv` is the audit trail
+for anything that got cut at any stage, and nothing is ever deleted, so
+the excluded originals are always still sitting where they started.
