@@ -117,10 +117,55 @@ subfolder inside each cluster, and records the pick + reasoning back
 into the manifest. Use `--dry-run` first to see which clusters would be
 sent without spending anything.
 
-## 6. Review
+## 6. Pass 3 — highlight extraction (optional, independent of pass 2)
 
-Flip through the `_contact_sheet.jpg` files and the `best/` subfolders,
-and treat `manifest.csv` as the audit trail for anything that got cut.
-Nothing is deleted, so if pass 1 or pass 2 was too aggressive on a
-particular cluster, the excluded originals are still sitting where they
-started.
+Pass 2 only fires on near-duplicate bursts and picks the sharpest frame.
+Pass 3 runs across *every* cluster — regardless of size or how similar the
+photos are — and asks a different question: which 1-3 photos from this
+whole event are the most interesting or emotionally resonant for the book
+(composition, genuine expressions, candid moments), not just which is
+technically correct. It works whether or not pass 2 has run: it prefers a
+cluster's `best/` picks when present, otherwise every `kept` survivor.
+
+```bash
+export ANTHROPIC_API_KEY=...   # or `ant auth login`
+python -m photo_pipeline.pass3 --output ~/culled -v
+```
+
+Picks are copied into a `highlights/` subfolder per cluster and logged to
+the manifest as `pass3_selected` / `pass3_notes` (mirroring pass 2's
+`pass2_selected` / `pass2_notes`). A cluster with only one surviving photo
+is auto-highlighted without spending an API call — there's nothing to
+compare. Use `--dry-run` first, and `--top-n` to change how many highlights
+per cluster (default 2).
+
+You can run pass 2 and pass 3 in either order, or skip pass 2 entirely and
+run pass 3 straight off pass 1's `kept` output.
+
+## 7. Fast local review
+
+A keyboard-driven local web app for quickly deciding keep/skip, one photo
+at a time, using whichever layer is most curated for each cluster
+(`highlights/` > `best/` > `kept`, whichever exists):
+
+```bash
+python3 -m photo_pipeline.review --output ~/culled
+```
+
+Opens a browser tab automatically. No network calls, no API key — this
+only reads files under `--output` and writes a small
+`review_decisions.json` next to `manifest.json`.
+
+Keys: `Y` keep, `N` skip (both auto-advance), `→`/space next without
+deciding, `←`/Backspace/`U` back (revisit a photo to change your mind).
+Decisions save after every keystroke, so closing the tab (or `Ctrl+C`-ing
+the server) never loses progress — relaunching resumes exactly where you
+left off.
+
+## 8. Review
+
+Flip through the `_contact_sheet.jpg` files, the `best/`/`highlights/`
+subfolders, or use the review tool above, and treat `manifest.csv` as the
+audit trail for anything that got cut. Nothing is deleted, so if any pass
+was too aggressive on a particular cluster, the excluded originals are
+still sitting where they started.

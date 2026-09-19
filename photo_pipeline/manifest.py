@@ -1,7 +1,11 @@
-"""Manifest of every decision pass 1 (and later pass 2) makes.
+"""Manifest of every decision pass 1 (and later pass 2 / pass 3) makes.
 
 One row per source photo, whether it survived or not, so a human can
 audit *why* something got cut without having to re-run the pipeline.
+
+New optional columns (like the pass2_*/pass3_* pairs below) are additive
+and default to None, so old manifest.json files still load fine, and code
+that doesn't know about a newer column just leaves it untouched.
 """
 
 from __future__ import annotations
@@ -37,6 +41,8 @@ class PhotoRecord:
     duplicate_of: Optional[str] = None
     pass2_selected: Optional[bool] = None
     pass2_notes: Optional[str] = None
+    pass3_selected: Optional[bool] = None
+    pass3_notes: Optional[str] = None
 
 
 _FIELDNAMES = list(PhotoRecord.__dataclass_fields__.keys())

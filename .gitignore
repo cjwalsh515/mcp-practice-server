@@ -7,6 +7,7 @@ __pycache__/
 client_secret*.json
 gmail_token.json
 gmail_export_log.json
+review_decisions.json
 chapters.yaml
 /culled/
 /pre-2015/
